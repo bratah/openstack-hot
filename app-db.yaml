@@ -1,0 +1,106 @@
+description: '- Template to deploy the Multi-Node Cluster'
+              
+heat_template_vappion: '2013-05-23'
+outputs:
+  APP Logs:
+    description: The APP provisioning logs are available here
+    value:
+      str_replace:
+        template: http://host:9999/app-mutlinode-Logs.html
+        params:
+          host: { get_attr: [deployer01-vm_floating_ip, floating_ip_address] }
+  
+parametapp:
+  app_vappion: {default: LATEST, description: App Backend version to be used, type: string}
+  app_customer: 
+    default: latest
+    description: Customer Backend to be used
+    type: string
+    constraints:
+      - allowed_values: [ lastest, stable ]
+  key_name: {default: default, description: Key to use for servapp, type: string}
+  image: {default: centos-v6.9, description: Image to be used for servapp, type: string}
+  flavor: {default: mem.large, description: Flavor to be used for servapp, type: string}
+  private_subnet_id: {default: selfservice, description: Subnet to be used for servapp, type: string}
+  private_net_id: {default: selfservice, description: Network to be used for servapp, type: string}
+  public_subnet_id: {default: provider, description: Subnet to be used for servapp, type: string}
+  public_net_id: {default: provider, description: Network to be used for servapp, type: string}
+  variable_name: {default: Test, description: Some variable, type: string}
+  variable_user: {default: User, description: Some variable, type: string}
+  enable_monitoring:
+    default: disable
+    description: Enabling Galieli for vm monitoring
+    type: string
+    constraints:
+      - allowed_values: [ enable,disable ]
+resources:
+
+########################################### APP VM ###########################################
+  appap01a:
+    type: OS::Nova::Server
+    properties:
+      flavor: mem.large #{get_param: flavor} # TO be replaced by PROD spec. equvalent flavour
+      image: centos-v6.9 #  {get_param: image} # Redhat 6 to be used
+      key_name: {get_param: key_name}
+      name: appap01a
+      networks:
+      - port: {get_resource: appap01a-vm_port}
+      user_data:
+          str_replace:
+            params:
+              __GALEILI__: { get_param: enable_monitoring }
+            template: |
+              #!/bin/bash
+              echo "Instance deployed!"
+              if [[ __GALEILI__ == "enable" ]];then
+                echo "\n\n Cloning GALEILI for monitoring vm metrics \n\n" >> /var/log/app-mutlinode-Logs.html
+                git clone https://github.com/seamless-distribution-systems/galilei.git ~/galeili >> /var/log/app-mutlinode-Logs.html
+                chmod +x ~/galeili/galieli-netdata-installer/linux-netdata_installer.bash
+                bash ~/galeili/galieli-netdata-installer/linux-netdata_installer.bash >> /var/log/app-mutlinode-Logs.html
+              fi
+  appap01a-vm_port:
+    type: OS::Neutron::Port
+    properties:
+      fixed_ips:
+        - {subnet_id: selfservice}
+      network_id: selfservice
+  appap01a-vm_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: provider
+      port_id: {get_resource: appap01a-vm_port}
+######################################## DB VM ###########################################
+  appdb01a:
+    type: OS::Nova::Server
+    properties:
+      flavor: mem.large #{get_param: flavor} # TO be replaced by PROD spec. equvalent flavour
+      image: centos-v6.9 #  {get_param: image} # Redhat 6 to be used
+      key_name: {get_param: key_name}
+      name: appdb01a
+      networks:
+        - port: {get_resource: appdb01a-vm_port}
+      user_data:
+          str_replace:
+            params:
+              __GALEILI__: { get_param: enable_monitoring }
+            template: |
+              #!/bin/bash
+              echo "Instance deployed!"
+              if [[ __GALEILI__ == "enable" ]];then
+                echo "\n\n Cloning GALEILI for monitoring vm metrics \n\n" >> /var/log/app-mutlinode-Logs.html
+                git clone https://github.com/seamless-distribution-systems/galilei.git ~/galeili >> /var/log/app-mutlinode-Logs.html
+                chmod +x ~/galeili/galieli-netdata-installer/linux-netdata_installer.bash
+                bash ~/galeili/galieli-netdata-installer/linux-netdata_installer.bash >> /var/log/app-mutlinode-Logs.html
+              fi
+  appdb01a-vm_port:
+    type: OS::Neutron::Port
+    properties:
+      fixed_ips:
+        - {subnet_id: selfservice}
+      network_id: selfservice
+  appdb01a-vm_floating_ip:
+    type: OS::Neutron::FloatingIP
+    properties:
+      floating_network_id: provider
+      port_id: {get_resource: appdb01a-vm_port}
+
